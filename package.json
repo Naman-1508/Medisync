@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "A full-stack medical appointment scheduling system",
   "scripts": {
-    "install-all": "cd server && npm install && cd ../client && npm install",
-    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\""
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
+    "start": "concurrently \"cd server && npm start\" \"cd client && npm run dev\""
   },
   "keywords": ["medical", "appointment", "scheduling", "mern"],
   "author": "",

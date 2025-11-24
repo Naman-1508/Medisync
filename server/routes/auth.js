@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
+const jwt = require('jsonwebtoken');
 const { sendTokenResponse } = require('../middleware/auth');
 const User = require('../models/User');
 
@@ -120,7 +121,7 @@ router.post('/refresh-token', async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
     
     // Check if user exists and refresh token matches
     const user = await User.findOne({ _id: decoded.id, refreshToken });
@@ -129,28 +130,8 @@ router.post('/refresh-token', async (req, res) => {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
-    // Generate new tokens
-    const newAccessToken = generateToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
-
-    // Update refresh token in database
-    user.refreshToken = newRefreshToken;
-    await user.save({ validateBeforeSave: false });
-
-    // Set cookie
-    res.cookie(process.env.COOKIE_NAME || 'token', newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 30 * 60 * 1000 // 30 minutes
-    });
-
-    // Send response
-    res.json({
-      success: true,
-      token: newAccessToken,
-      refreshToken: newRefreshToken
-    });
+    // Generate new tokens using sendTokenResponse
+    sendTokenResponse(user, 200, res);
   } catch (err) {
     console.error(err);
     res.status(401).json({ message: 'Invalid refresh token' });

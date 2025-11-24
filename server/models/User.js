@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -27,16 +28,48 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['patient', 'doctor', 'admin'],
+    enum: ['patient', 'doctor', 'admin', 'nurse', 'pharmacist', 'receptionist'],
     default: 'patient'
+  },
+  specialization: {
+    type: String,
+    trim: true
+  },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department'
+  },
+  licenseNumber: String,
+  experience: Number,
+  qualifications: [String],
+  bio: String,
+  consultationFee: {
+    type: Number,
+    default: 0
+  },
+  availability: {
+    days: [{
+      type: String,
+      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+    }],
+    startTime: String,
+    endTime: String
   },
   phone: {
     type: String,
     maxlength: [20, 'Phone number cannot be longer than 20 characters']
   },
+  specialization: {
+    type: String,
+    trim: true
+  },
   profileImage: {
     type: String,
     default: 'default.jpg'
+  },
+  isApproved: {
+    type: Boolean,
+    default: false
   },
   isVerified: {
     type: Boolean,

@@ -1,2 +1,43 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Environment files
 .env
-node_modules
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# OS/System files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Backend specific
+server/node_modules/
+server/logs/
+server/uploads/
+
+# Frontend specific
+client/node_modules/
+client/.next/
+client/out/
+
+# Lockfiles (if using only one manager)
+pnpm-lock.yaml
+yarn.lock
+package-lock.json

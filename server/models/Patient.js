@@ -1,5 +1,6 @@
 // server/models/Patient.js
 const mongoose = require('mongoose');
+const User = require('./User');
 
 const patientSchema = new mongoose.Schema({
   user: {

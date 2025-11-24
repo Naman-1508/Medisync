@@ -3,6 +3,7 @@ const router = express.Router();
 const { check } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
 const User = require('../models/User');
+const Appointment = require('../models/Appointment');
 
 // @route   GET /api/doctors
 // @desc    Get all doctors (approved only)

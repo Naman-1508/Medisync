@@ -6,8 +6,12 @@ exports.protect = async (req, res, next) => {
   try {
     let token;
     
-    // Get token from cookies
-    token = req.cookies.token;
+    // Get token from cookies or Authorization header
+    if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
 
     if (!token) {
       return res.status(401).json({ message: 'Not authorized to access this route' });
@@ -17,6 +21,9 @@ exports.protect = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = await User.findById(decoded.id).select('-password -refreshToken');
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
       next();
     } catch (err) {
       return res.status(401).json({ message: 'Not authorized, token failed' });
@@ -29,6 +36,9 @@ exports.protect = async (req, res, next) => {
 // Grant access to specific roles
 exports.authorize = (...roles) => {
   return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         message: `User role ${req.user.role} is not authorized to access this route`
@@ -82,7 +92,9 @@ const sendTokenResponse = (user, statusCode, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        isApproved: user.isApproved
+        isApproved: user.isApproved,
+        specialization: user.specialization,
+        phone: user.phone
       }
     });
 };

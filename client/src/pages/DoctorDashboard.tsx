@@ -1,0 +1,369 @@
+import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import { appointmentsApi } from '../utils/api'
+import { Appointment, User } from '../types'
+import { Calendar, Clock, User as UserIcon, LogOut, Check, X, FileText, Pill } from 'lucide-react'
+import Button from '../components/ui/Button'
+import Card, { CardHeader, CardContent } from '../components/ui/Card'
+import { format } from 'date-fns'
+
+export default function DoctorDashboard() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [diagnosis, setDiagnosis] = useState('')
+  const [prescription, setPrescription] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [])
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await appointmentsApi.getMine()
+      setAppointments(response.data)
+    } catch (error) {
+      console.error('Failed to fetch appointments:', error)
+    }
+  }
+
+  const handleCompleteAppointment = async () => {
+    if (!selectedAppointment) return
+
+    setLoading(true)
+    try {
+      await appointmentsApi.complete(selectedAppointment._id, {
+        diagnosis,
+        prescription
+      })
+      toast.success('Appointment marked as completed')
+      setShowCompleteModal(false)
+      setSelectedAppointment(null)
+      setDiagnosis('')
+      setPrescription('')
+      fetchAppointments()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to complete appointment')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const openCompleteModal = (appointment: Appointment) => {
+    setSelectedAppointment(appointment)
+    setDiagnosis(appointment.diagnosis || '')
+    setPrescription(appointment.prescription || '')
+    setShowCompleteModal(true)
+  }
+
+
+  const upcomingAppointments = appointments.filter(apt => {
+    const aptDate = new Date(apt.date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return aptDate >= today && apt.status === 'scheduled'
+  })
+
+  const pastAppointments = appointments.filter(apt => {
+    const aptDate = new Date(apt.date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return aptDate < today || apt.status === 'completed' || apt.status === 'cancelled'
+  })
+
+  if (user && !user.isApproved) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Account Pending Approval</h2>
+          <p className="text-gray-600 mb-6">
+            Your doctor account is pending admin approval. You will be able to access the dashboard once approved.
+          </p>
+          <button
+            onClick={handleLogout}
+            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Doctor Dashboard</h1>
+              <p className="text-sm text-gray-600">Welcome, Dr. {user?.name}</p>
+              {user?.specialization && (
+                <p className="text-sm text-primary-600">{user.specialization}</p>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Appointments</p>
+                  <p className="text-2xl font-bold text-gray-900">{appointments.length}</p>
+                </div>
+                <Calendar className="h-8 w-8 text-primary-600 opacity-20" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Upcoming</p>
+                  <p className="text-2xl font-bold text-primary-600">{upcomingAppointments.length}</p>
+                </div>
+                <Clock className="h-8 w-8 text-primary-600 opacity-20" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Completed</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {appointments.filter(a => a.status === 'completed').length}
+                  </p>
+                </div>
+                <Check className="h-8 w-8 text-green-600 opacity-20" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Upcoming Appointments */}
+        <Card className="mb-8">
+          <CardHeader title="Upcoming Appointments" />
+          <CardContent>
+            <div className="divide-y divide-gray-200">
+              {upcomingAppointments.length === 0 ? (
+                <div className="py-12 text-center text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p>No upcoming appointments</p>
+                </div>
+              ) : (
+                upcomingAppointments.map((apt) => {
+                  const patient = typeof apt.patient === 'object' ? apt.patient : null
+                  return (
+                    <div key={apt._id} className="py-4 hover:bg-gray-50">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <UserIcon className="h-5 w-5 text-primary-600" />
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {patient?.name || 'Unknown Patient'}
+                            </h3>
+                          </div>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600 ml-8">
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>{format(new Date(apt.date), 'MMM dd, yyyy')}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{apt.startTime} - {apt.endTime}</span>
+                            </div>
+                            {patient?.email && (
+                              <span className="text-gray-500">{patient.email}</span>
+                            )}
+                          </div>
+                          {apt.symptoms && apt.symptoms.length > 0 && (
+                            <div className="mt-2 ml-8">
+                              <p className="text-sm text-gray-600">
+                                <span className="font-medium">Symptoms:</span> {apt.symptoms.join(', ')}
+                              </p>
+                            </div>
+                          )}
+                          {apt.notes && (
+                            <div className="mt-2 ml-8">
+                              <p className="text-sm text-gray-600">
+                                <span className="font-medium">Notes:</span> {apt.notes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const patient = typeof apt.patient === 'object' ? apt.patient : null
+                              navigate('/medical-records', { state: { createForAppointment: apt._id, patientId: patient?._id } })
+                            }}
+                            variant="outline"
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            Record
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const patient = typeof apt.patient === 'object' ? apt.patient : null
+                              navigate('/prescriptions', { state: { createForAppointment: apt._id, patientId: patient?._id } })
+                            }}
+                            variant="outline"
+                          >
+                            <Pill className="h-4 w-4 mr-1" />
+                            Prescribe
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => openCompleteModal(apt)}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            Complete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Past Appointments */}
+        <Card>
+          <CardHeader title="Past Appointments" />
+          <CardContent>
+          <div className="divide-y divide-gray-200">
+            {pastAppointments.length === 0 ? (
+              <div className="py-12 text-center text-gray-500">
+                <p>No past appointments</p>
+              </div>
+            ) : (
+              pastAppointments.map((apt) => {
+                const patient = typeof apt.patient === 'object' ? apt.patient : null
+                return (
+                  <div key={apt._id} className="py-4 hover:bg-gray-50">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <UserIcon className="h-5 w-5 text-primary-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {patient?.name || 'Unknown Patient'}
+                        </h3>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          apt.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {apt.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm text-gray-600 ml-8 mb-2">
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>{format(new Date(apt.date), 'MMM dd, yyyy')}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{apt.startTime} - {apt.endTime}</span>
+                        </div>
+                      </div>
+                      {apt.diagnosis && (
+                        <div className="mt-2 ml-8">
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Diagnosis:</span> {apt.diagnosis}
+                          </p>
+                        </div>
+                      )}
+                      {apt.prescription && (
+                        <div className="mt-2 ml-8">
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Prescription:</span> {apt.prescription}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Complete Appointment Modal */}
+      {showCompleteModal && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Complete Appointment</h2>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Diagnosis</label>
+                <textarea
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter diagnosis..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prescription</label>
+                <textarea
+                  value={prescription}
+                  onChange={(e) => setPrescription(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter prescription..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowCompleteModal(false)
+                    setSelectedAppointment(null)
+                    setDiagnosis('')
+                    setPrescription('')
+                  }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCompleteAppointment}
+                  disabled={loading}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Saving...' : 'Complete Appointment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+

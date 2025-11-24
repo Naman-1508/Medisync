@@ -22,6 +22,11 @@ app.use('/api/doctors', require('./routes/doctors'));
 app.use('/api/patients', require('./routes/patients'));
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/departments', require('./routes/departments'));
+app.use('/api/medical-records', require('./routes/medicalRecords'));
+app.use('/api/prescriptions', require('./routes/prescriptions'));
+app.use('/api/billing', require('./routes/billing'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

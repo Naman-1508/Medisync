@@ -3,6 +3,7 @@ const router = express.Router();
 const { check } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
 const Appointment = require('../models/Appointment');
+const User = require('../models/User');
 
 // @route   POST /api/appointments
 // @desc    Create a new appointment
@@ -210,17 +211,24 @@ router.get('/available-slots', async (req, res) => {
     const endHour = 17; // 5 PM
     
     for (let hour = startHour; hour < endHour; hour++) {
-      const time = `${hour.toString().padStart(2, '0')}:00`;
-      const endTime = `${hour + 1 > 12 ? hour + 1 - 12 : hour + 1}:00 ${hour + 1 >= 12 ? 'PM' : 'AM'}`;
+      const startTime24 = `${hour.toString().padStart(2, '0')}:00`;
+      const endHour24 = hour + 1;
+      const endTime24 = `${endHour24.toString().padStart(2, '0')}:00`;
+      
+      // Format for display
+      const startTimeDisplay = `${hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
+      const endTimeDisplay = `${endHour24 > 12 ? endHour24 - 12 : endHour24 === 0 ? 12 : endHour24}:00 ${endHour24 >= 12 ? 'PM' : 'AM'}`;
       
       // Check if this time slot is already booked
       const isBooked = appointments.some(apt => {
-        return apt.startTime === time && apt.status !== 'cancelled';
+        return apt.startTime === startTime24 && apt.status !== 'cancelled';
       });
       
       timeSlots.push({
-        time: `${hour > 12 ? hour - 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`,
-        endTime,
+        time: startTimeDisplay,
+        endTime: endTimeDisplay,
+        startTime: startTime24,
+        endTime24: endTime24,
         available: !isBooked
       });
     }

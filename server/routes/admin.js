@@ -195,7 +195,7 @@ router.delete('/users/:id', async (req, res) => {
     }
     
     // Delete the user
-    await user.remove();
+    await User.findByIdAndDelete(req.params.id);
     
     res.json({ message: 'User and associated data removed' });
   } catch (err) {
