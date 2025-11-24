@@ -3,21 +3,42 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { Stethoscope } from 'lucide-react'
+import { RegisterableRole } from '../types'
+
+const ROLE_OPTIONS: Array<{ label: string; value: RegisterableRole; description: string }> = [
+  { label: 'Patient', value: 'patient', description: 'Book appointments and access records' },
+  { label: 'Doctor', value: 'doctor', description: 'Manage patients and appointments (requires admin approval)' },
+  { label: 'Nurse', value: 'nurse', description: 'Assist doctors and manage patient vitals' },
+  { label: 'Receptionist', value: 'receptionist', description: 'Handle scheduling and check-ins' },
+  { label: 'Pharmacist', value: 'pharmacist', description: 'Manage prescriptions and dispensing' }
+]
+
+type RegisterFormState = {
+  name: string
+  email: string
+  password: string
+  confirmPassword: string
+  role: RegisterableRole
+}
 
 export default function Register() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterFormState>({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'patient' as 'patient' | 'doctor'
+    role: 'patient'
   })
   const [loading, setLoading] = useState(false)
   const { register } = useAuth()
   const navigate = useNavigate()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setFormData({
+      ...formData,
+      [name]: name === 'role' ? (value as RegisterableRole) : value
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,7 +113,7 @@ export default function Register() {
 
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-              I am a
+              I am registering as
             </label>
             <select
               id="role"
@@ -101,9 +122,15 @@ export default function Register() {
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="patient">Patient</option>
-              <option value="doctor">Doctor</option>
+              {ROLE_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
+            <p className="mt-2 text-xs text-gray-500">
+              {ROLE_OPTIONS.find(option => option.value === formData.role)?.description}
+            </p>
           </div>
 
           <div>
@@ -157,4 +184,5 @@ export default function Register() {
     </div>
   )
 }
+
 

@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { User } from '../types'
+import { RegisterableRole, User } from '../types'
 import api from '../utils/api'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string, role: 'patient' | 'doctor') => Promise<void>
+  register: (name: string, email: string, password: string, role: RegisterableRole) => Promise<void>
   logout: () => Promise<void>
   updateUser: (userData: Partial<User>) => void
   refreshUser: () => Promise<void>
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
   }
 
-  const register = async (name: string, email: string, password: string, role: 'patient' | 'doctor') => {
+  const register = async (name: string, email: string, password: string, role: RegisterableRole) => {
     const response = await api.post('/auth/register', { name, email, password, role })
     const { token, user: userData } = response.data
     localStorage.setItem('token', token)

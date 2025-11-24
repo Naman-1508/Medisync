@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { RegisterableRole } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -45,7 +46,7 @@ export default api
 // API endpoints
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
-  register: (data: { name: string; email: string; password: string; role: string }) => api.post('/auth/register', data),
+  register: (data: { name: string; email: string; password: string; role: RegisterableRole }) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
 }
@@ -112,6 +113,7 @@ export const notificationsApi = {
 export const adminApi = {
   getPendingDoctors: () => api.get('/admin/doctors/pending'),
   approveDoctor: (id: string) => api.put(`/admin/doctors/${id}/approve`),
+  approveUser: (id: string) => api.put(`/admin/users/${id}/approve`),
   deleteDoctor: (id: string) => api.delete(`/admin/doctors/${id}`),
   getAnalytics: () => api.get('/admin/analytics'),
   getAllUsers: () => api.get('/admin/users'),

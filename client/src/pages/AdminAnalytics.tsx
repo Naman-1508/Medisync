@@ -1,19 +1,14 @@
-import { useState } from 'react'
-import { toast } from 'react-toastify'
-import { useAuth } from '../context/AuthContext'
-import { adminApi } from '../utils/api'
 import Card from '../components/ui/Card'
+import { useAuth } from '../context/AuthContext'
 import { useAdminDashboard } from '../features/admin/hooks/useAdminDashboard'
 import StatsOverview from '../features/admin/components/StatsOverview'
 import AppointmentsInsights from '../features/admin/components/AppointmentsInsights'
 import RevenueInsights from '../features/admin/components/RevenueInsights'
 import TopDoctorsTable from '../features/admin/components/TopDoctorsTable'
-import UserManagementPanel from '../features/admin/components/UserManagementPanel'
 
-export default function AdminDashboard() {
+export default function AdminAnalytics() {
   const { user } = useAuth()
-  const { analytics, users, loading, error, refetchAnalytics, refetchUsers } = useAdminDashboard()
-  const [pendingActionIds, setPendingActionIds] = useState<Record<string, boolean>>({})
+  const { analytics, loading, error, refetchAnalytics } = useAdminDashboard()
 
   if (!user || user.role !== 'admin') {
     return (
@@ -26,51 +21,9 @@ export default function AdminDashboard() {
     )
   }
 
-  const markActionPending = (userId: string) =>
-    setPendingActionIds(prev => ({ ...prev, [userId]: true }))
+  const showAnalyticsLoader = loading.analytics && !analytics
 
-  const clearActionPending = (userId: string) =>
-    setPendingActionIds(prev => {
-      const updated = { ...prev }
-      delete updated[userId]
-      return updated
-    })
-
-  const handleApproveUser = async (pendingUserId: string) => {
-    markActionPending(pendingUserId)
-    try {
-      await adminApi.approveUser(pendingUserId)
-      toast.success('User approved successfully')
-      await Promise.all([refetchUsers(), refetchAnalytics()])
-    } catch (err) {
-      console.error('Failed to approve user:', err)
-      toast.error('Failed to approve user')
-    } finally {
-      clearActionPending(pendingUserId)
-    }
-  }
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm('Are you sure you want to remove this user?')) {
-      return
-    }
-
-    markActionPending(userId)
-    try {
-      await adminApi.deleteUser(userId)
-      toast.success('User removed successfully')
-      await Promise.all([refetchUsers(), refetchAnalytics()])
-    } catch (err) {
-      console.error('Failed to delete user:', err)
-      toast.error('Failed to delete user')
-    } finally {
-      clearActionPending(userId)
-    }
-  }
-
-  const isAnalyticsLoading = loading.analytics && !analytics
-
-  if (isAnalyticsLoading) {
+  if (showAnalyticsLoader) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -112,15 +65,8 @@ export default function AdminDashboard() {
             </p>
           </Card>
         )}
-
-        <UserManagementPanel
-          users={users}
-          loading={loading.users}
-          pendingActionIds={pendingActionIds}
-          onApprove={handleApproveUser}
-          onDelete={handleDeleteUser}
-        />
       </div>
     </div>
   )
 }
+

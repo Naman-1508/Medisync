@@ -4,6 +4,7 @@ const { check } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
+const Billing = require('../models/Billing');
 
 // Middleware to ensure only admins can access these routes
 router.use(protect);
@@ -26,29 +27,61 @@ router.get('/doctors/pending', async (req, res) => {
   }
 });
 
+const STAFF_APPROVABLE_ROLES = ['doctor', 'nurse', 'receptionist', 'pharmacist'];
+
+async function approveUserById(userId) {
+  const user = await User.findById(userId).select('-password -refreshToken');
+
+  if (!user) {
+    return { status: 404, message: 'User not found' };
+  }
+
+  if (!STAFF_APPROVABLE_ROLES.includes(user.role)) {
+    return { status: 400, message: 'Only staff members require approval' };
+  }
+
+  if (user.isApproved) {
+    return { status: 200, user, message: 'User already approved' };
+  }
+
+  user.isApproved = true;
+  await user.save();
+  return { status: 200, user, message: 'User approved successfully' };
+}
+
 // @route   PUT /api/admin/doctors/:id/approve
-// @desc    Approve a doctor
+// @desc    Approve a doctor (legacy route)
 // @access  Private (Admin only)
 router.put('/doctors/:id/approve', async (req, res) => {
   try {
-    const doctor = await User.findByIdAndUpdate(
-      req.params.id,
-      { isApproved: true },
-      { new: true }
-    ).select('-password -refreshToken');
-
-    if (!doctor) {
-      return res.status(404).json({ message: 'Doctor not found' });
+    const result = await approveUserById(req.params.id);
+    if (!result.user) {
+      return res.status(result.status).json({ message: result.message });
     }
-
-    res.json({ 
-      message: 'Doctor approved successfully',
-      doctor 
-    });
+    res.json({ message: result.message, user: result.user });
   } catch (err) {
     console.error(err.message);
     if (err.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Doctor not found' });
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT /api/admin/users/:id/approve
+// @desc    Approve a staff member (doctor, nurse, receptionist, pharmacist)
+// @access  Private (Admin only)
+router.put('/users/:id/approve', async (req, res) => {
+  try {
+    const result = await approveUserById(req.params.id);
+    if (!result.user) {
+      return res.status(result.status).json({ message: result.message });
+    }
+    res.json({ message: result.message, user: result.user });
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'User not found' });
     }
     res.status(500).send('Server Error');
   }
@@ -83,73 +116,139 @@ router.delete('/doctors/:id', async (req, res) => {
 // @access  Private (Admin only)
 router.get('/analytics', async (req, res) => {
   try {
-    // Get total counts
-    const totalPatients = await User.countDocuments({ role: 'patient' });
-    const totalDoctors = await User.countDocuments({ 
-      role: 'doctor',
-      isApproved: true 
-    });
-    const totalAppointments = await Appointment.countDocuments();
-    
-    // Get appointments per day for the last 30 days
-    const thirtyDaysAgo = new Date();
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const thirtyDaysAgo = new Date(endOfDay);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const appointmentsByDay = await Appointment.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: thirtyDaysAgo },
-          status: { $ne: 'cancelled' }
-        }
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
+
+    const [
+      totalPatients,
+      totalDoctors,
+      pendingApprovals,
+      totalAppointments,
+      todaysAppointments,
+      appointmentsByDayRaw,
+      appointmentsByStatusRaw,
+      topDoctors,
+      revenueTrendRaw,
+      revenueBreakdownRaw,
+      userDistribution
+    ] = await Promise.all([
+      User.countDocuments({ role: 'patient' }),
+      User.countDocuments({ role: 'doctor', isApproved: true }),
+      User.countDocuments({ role: 'doctor', isApproved: false }),
+      Appointment.countDocuments(),
+      Appointment.countDocuments({ createdAt: { $gte: startOfDay, $lte: endOfDay } }),
+      Appointment.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: thirtyDaysAgo, $lte: endOfDay },
+            status: { $ne: 'cancelled' }
+          }
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      Appointment.aggregate([
+        {
+          $group: {
+            _id: { $ifNull: ['$status', 'unspecified'] },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } }
+      ]),
+      Appointment.aggregate([
+        {
+          $match: { status: { $ne: 'cancelled' } }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'doctor',
+            foreignField: '_id',
+            as: 'doctorInfo'
+          }
+        },
+        { $unwind: '$doctorInfo' },
+        {
+          $group: {
+            _id: '$doctor',
+            name: { $first: '$doctorInfo.name' },
+            specialization: { $first: '$doctorInfo.specialization' },
+            appointmentCount: { $sum: 1 }
+          }
+        },
+        { $sort: { appointmentCount: -1 } },
+        { $limit: 5 }
+      ]),
+      Billing.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: thirtyDaysAgo },
+            paymentStatus: { $ne: 'refunded' }
+          }
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            total: { $sum: '$total' }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      Billing.aggregate([
+        {
+          $match: {
+            paymentStatus: { $ne: 'refunded' }
+          }
+        },
+        {
+          $group: {
+            _id: { $ifNull: ['$paymentStatus', 'unspecified'] },
+            total: { $sum: '$total' }
+          }
+        },
+        { $sort: { total: -1 } }
+      ]),
+      User.aggregate([
+        {
+          $group: {
+            _id: { $ifNull: ['$role', 'unspecified'] },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } }
+      ])
     ]);
-    
-    // Get appointments by status
-    const appointmentsByStatus = await Appointment.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    // Get top 5 doctors by number of appointments
-    const topDoctors = await Appointment.aggregate([
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'doctor',
-          foreignField: '_id',
-          as: 'doctorInfo'
-        }
-      },
-      { $unwind: '$doctorInfo' },
-      {
-        $group: {
-          _id: '$doctor',
-          name: { $first: '$doctorInfo.name' },
-          specialization: { $first: '$doctorInfo.specialization' },
-          appointmentCount: { $sum: 1 }
-        }
-      },
-      { $sort: { appointmentCount: -1 } },
-      { $limit: 5 }
-    ]);
-    
+
+    const appointmentsByDay = appointmentsByDayRaw || [];
+    const appointmentsByStatus = appointmentsByStatusRaw || [];
+    const revenueTrend = revenueTrendRaw || [];
+    const revenueBreakdown = revenueBreakdownRaw || [];
+    const revenue = revenueTrend.reduce((sum, entry) => sum + (entry.total || 0), 0);
+
     res.json({
       totalPatients,
       totalDoctors,
       totalAppointments,
+      todaysAppointments,
+      pendingApprovals,
+      revenue,
       appointmentsByDay,
       appointmentsByStatus,
+      revenueTrend,
+      revenueBreakdown,
+      userDistribution: userDistribution || [],
       topDoctors
     });
   } catch (err) {
@@ -163,8 +262,9 @@ router.get('/analytics', async (req, res) => {
 // @access  Private (Admin only)
 router.get('/users', async (req, res) => {
   try {
+    const managedRoles = ['patient', 'doctor', 'nurse', 'receptionist', 'pharmacist'];
     const users = await User.find({ 
-      role: { $in: ['patient', 'doctor'] } 
+      role: { $in: managedRoles } 
     }).select('-password -refreshToken')
       .sort({ role: 1, name: 1 });
     

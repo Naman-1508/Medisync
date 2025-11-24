@@ -116,6 +116,12 @@ export default function Header() {
                   Appointments
                 </Link>
               )}
+              <Link
+                to="/billing"
+                className="text-gray-700 hover:text-primary-600 transition-colors"
+              >
+                Billing
+              </Link>
               {user.role === 'admin' && (
                 <>
                   <Link
@@ -317,6 +323,40 @@ export default function Header() {
                   </Link>
                 </>
               )}
+              {user.role === 'doctor' && (
+                <Link
+                  to="/appointments"
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Appointments
+                </Link>
+              )}
+              <Link
+                to="/billing"
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Billing
+              </Link>
+              {user.role === 'admin' && (
+                <>
+                  <Link
+                    to="/admin/users"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Users
+                  </Link>
+                  <Link
+                    to="/admin/analytics"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Analytics
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
         )}
@@ -335,4 +375,5 @@ export default function Header() {
     </header>
   )
 }
+
 

@@ -8,13 +8,17 @@ const User = require('../models/User');
 // @route   POST /api/auth/register
 // @desc    Register user
 // @access  Public
+const REGISTERABLE_ROLES = ['patient', 'doctor', 'nurse', 'receptionist', 'pharmacist'];
+const ROLES_REQUIRING_APPROVAL = ['doctor', 'nurse', 'receptionist', 'pharmacist'];
+const AUTO_APPROVED_ROLES = REGISTERABLE_ROLES.filter((role) => !ROLES_REQUIRING_APPROVAL.includes(role));
+
 router.post(
   '/register',
   [
     check('name', 'Name is required').not().isEmpty(),
     check('email', 'Please include a valid email').isEmail(),
     check('password', 'Please enter a password with 6 or more characters').isLength({ min: 6 }),
-    check('role', 'Please specify a valid role').isIn(['patient', 'doctor'])
+    check('role', 'Please specify a valid role').isIn(REGISTERABLE_ROLES)
   ],
   async (req, res) => {
     try {
@@ -32,7 +36,7 @@ router.post(
         email,
         password,
         role,
-        isApproved: role === 'patient' // Auto-approve patients, doctors need admin approval
+        isApproved: AUTO_APPROVED_ROLES.includes(role)
       });
 
       await user.save();
@@ -71,9 +75,9 @@ router.post(
         return res.status(400).json({ message: 'Invalid credentials' });
       }
 
-      // Check if user is approved (for doctors)
-      if (user.role === 'doctor' && !user.isApproved) {
-        return res.status(400).json({ message: 'Your account is pending approval' });
+      // Check if user is approved (staff roles require admin approval)
+      if (ROLES_REQUIRING_APPROVAL.includes(user.role) && !user.isApproved) {
+        return res.status(400).json({ message: 'Your account is pending admin approval' });
       }
 
       // Send token response

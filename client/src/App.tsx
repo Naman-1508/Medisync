@@ -8,7 +8,10 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import PatientDashboard from './pages/PatientDashboard'
 import DoctorDashboard from './pages/DoctorDashboard'
+import StaffDashboard from './pages/StaffDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminAnalytics from './pages/AdminAnalytics'
+import AdminUsers from './pages/AdminUsers'
 import Home from './pages/Home'
 import MedicalRecords from './pages/MedicalRecords'
 import Prescriptions from './pages/Prescriptions'
@@ -17,6 +20,8 @@ import Departments from './pages/Departments'
 import Profile from './pages/Profile'
 import Doctors from './pages/Doctors'
 import Appointments from './pages/Appointments'
+
+const STAFF_ROLES = ['nurse', 'receptionist', 'pharmacist'] as const
 
 interface PrivateRouteProps {
   children: React.ReactNode
@@ -69,11 +74,38 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
+      {STAFF_ROLES.map(role => (
+        <Route
+          key={role}
+          path={`/${role}/dashboard`}
+          element={
+            <PrivateRoute allowedRoles={[role]}>
+              <StaffDashboard />
+            </PrivateRoute>
+          }
+        />
+      ))}
       <Route
         path="/admin/dashboard"
         element={
           <PrivateRoute allowedRoles={['admin']}>
             <AdminDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/analytics"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminAnalytics />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminUsers />
           </PrivateRoute>
         }
       />

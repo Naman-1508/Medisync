@@ -19,7 +19,11 @@ export interface User {
     startTime: string
     endTime: string
   }
+  createdAt?: string
+  updatedAt?: string
 }
+
+export type RegisterableRole = 'patient' | 'doctor' | 'nurse' | 'pharmacist' | 'receptionist'
 
 export interface Department {
   _id: string
@@ -234,12 +238,24 @@ export interface DashboardStats {
   totalAppointments: number
   todaysAppointments: number
   pendingApprovals: number
-  revenue?: number
+  revenue: number
   appointmentsByStatus: Array<{
     _id: string
     count: number
   }>
   appointmentsByDay: Array<{
+    _id: string
+    count: number
+  }>
+  revenueTrend?: Array<{
+    _id: string
+    total: number
+  }>
+  revenueBreakdown?: Array<{
+    _id: string
+    total: number
+  }>
+  userDistribution?: Array<{
     _id: string
     count: number
   }>
